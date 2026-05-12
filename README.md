@@ -13,6 +13,42 @@
 
 ---
 
+## 現在の状況とクイックスタート
+
+MVP のコードは実装済み。ローカルで地図 UI が動作することは確認済み。
+**ODPT (公共交通オープンデータセンター) のアクセストークン認可待ち** の段階で停止中。
+
+### 認可済みなインフラ (作業不要)
+
+- Upstash Redis (Vercel Marketplace) — プロビジョン済み、`KV_REST_API_*` を `.env.local` に設定済み
+- Neon Postgres (Vercel Marketplace) — プロビジョン済み、`DATABASE_URL` を `.env.local` に設定済み
+- `pnpm db:push` 実行済み (`stations` テーブル作成済み)
+
+### トークン到着後の再開チェックリスト
+
+1. ODPT 開発者サイト (<https://developer.odpt.org/>) でアクセストークンを発行
+2. `.env.local` に `ODPT_CONSUMER_KEY=...` を追記
+3. ODPT ダッシュボードで **HELLO CYCLING の実際の system_id** を確認
+   - コード上は `"openstreet"` と推測で入れている
+   - 違う場合は `.env.local` に `ODPT_HELLOCYCLING_SYSTEM_ID=<実際の名前>` を追加 (ドコモは `docomo-cycle-tokyo` で確定)
+4. `pnpm poll:once` を実行し、両サービスとも `ok: N stations / N statuses` が出ることを確認
+5. `pnpm dev` で <http://localhost:3000> を開き、地図上にマーカー (緑/黄/赤の色分け) が表示されることを確認
+6. 確認できたら Vercel に本番デプロイ
+   - Vercel プロジェクト作成 → GitHub 連携 (リポジトリは <https://github.com/masahiro-morita-1019/cycle-map>)
+   - Vercel 環境変数に `ODPT_CONSUMER_KEY` と `CRON_SECRET` (`openssl rand -base64 32` で生成) を追加
+   - 初回デプロイ後、Cron Jobs タブで `/api/cron/poll` (`*/2 * * * *`) と `/api/cron/refresh-static` (`0 3 * * *`) が登録されていることを確認
+   - `/api/cron/refresh-static` を手動実行してテーブルを埋める
+
+### 任意で後回しになっている項目
+
+- 連絡先メールアドレス: `app/components/About.tsx:6` の `contact@example.com` を実アドレスに差し替え
+- Protomaps API キー: 設定すれば見た目が綺麗になる (未設定なら OSM raster でも動作)
+- 都道府県境界 GeoJSON: `public/prefectures.json` を配置するとコロプレス機能が有効化
+- フェーズ3候補 (LUUP / PiPPA / COGICOGI / ecobike) の GBFS 提供状況調査
+- ドコモのエリア拡張 (横浜・川崎・仙台・広島) の取得元調査
+
+---
+
 ## 技術スタック
 
 | 層 | 採用 |
