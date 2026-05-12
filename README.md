@@ -63,9 +63,10 @@ ODPT_CONSUMER_KEY=取得したアクセストークン
 # ODPT_HELLOCYCLING_SYSTEM_ID=openstreet
 # ODPT_DOCOMO_SYSTEM_ID=docomo-cycle-tokyo
 
-# Upstash Redis (Vercel Marketplace の統合で自動注入される)
-UPSTASH_REDIS_REST_URL=
-UPSTASH_REDIS_REST_TOKEN=
+# Upstash Redis (Vercel Marketplace の Upstash for Redis 統合で自動注入)
+# Vercel KV のサンセット後も後方互換のため KV_* の名前で来る
+KV_REST_API_URL=
+KV_REST_API_TOKEN=
 
 # Neon Postgres
 DATABASE_URL=postgresql://...

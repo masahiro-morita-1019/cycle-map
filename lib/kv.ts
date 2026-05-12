@@ -7,7 +7,17 @@ let _redis: Redis | null = null;
 
 function redis(): Redis {
   if (_redis) return _redis;
-  _redis = Redis.fromEnv();
+  // Vercel Marketplace の Upstash for Redis 統合は後方互換のため KV_* 変数を
+  // 出力する。Upstash 直契約の場合は UPSTASH_* が来るので両方に対応する。
+  const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
+  const token =
+    process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) {
+    throw new Error(
+      "Upstash Redis env vars not set (KV_REST_API_URL/TOKEN or UPSTASH_REDIS_REST_URL/TOKEN)",
+    );
+  }
+  _redis = new Redis({ url, token });
   return _redis;
 }
 
