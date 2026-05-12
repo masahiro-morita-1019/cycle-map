@@ -19,7 +19,7 @@
 |---|---|
 | フロントエンド | Next.js 15 (App Router) + React 19 + TypeScript + Tailwind |
 | 地図 | MapLibre GL JS + Protomaps (フォールバック: OSM raster) |
-| キャッシュ | Vercel KV (Upstash Redis) — 動的な空き状況 |
+| キャッシュ | Upstash Redis (Vercel Marketplace) — 動的な空き状況 |
 | DB | Neon Postgres + Drizzle ORM — 静的ポート情報 |
 | データ取得 | Vercel Cron で定期ポーリング |
 | ホスティング | Vercel |
@@ -40,7 +40,7 @@ pnpm install
 | 項目 | 取得先 | 必須 |
 |---|---|---|
 | ODPT アクセストークン | <https://developer.odpt.org/> で会員登録 (無料) → アクセストークン発行 | ✓ |
-| Vercel KV (Upstash Redis) | Vercel ダッシュボード → Storage → Create → KV | ✓ |
+| Upstash Redis (Vercel Marketplace) | Vercel ダッシュボード → Storage → Create → KV | ✓ |
 | Neon Postgres | <https://neon.tech/> もしくは Vercel ダッシュボード → Storage → Create → Postgres | ✓ |
 | Protomaps API キー | <https://protomaps.com/> | 任意 (未設定なら OSM ラスタ) |
 | Cron Secret | 任意の長いランダム文字列 | 本番のみ |
@@ -63,11 +63,9 @@ ODPT_CONSUMER_KEY=取得したアクセストークン
 # ODPT_HELLOCYCLING_SYSTEM_ID=openstreet
 # ODPT_DOCOMO_SYSTEM_ID=docomo-cycle-tokyo
 
-# Vercel KV (Upstash) — Vercel ダッシュボードからコピペ
-KV_URL=
-KV_REST_API_URL=
-KV_REST_API_TOKEN=
-KV_REST_API_READ_ONLY_TOKEN=
+# Upstash Redis (Vercel Marketplace の統合で自動注入される)
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
 
 # Neon Postgres
 DATABASE_URL=postgresql://...
@@ -172,7 +170,7 @@ cycle-map/
 │   │       ├── hellocycling.ts
 │   │       └── docomo.ts
 │   ├── providers.ts                # プロバイダ一覧 / ディスパッチ
-│   ├── kv.ts                       # Vercel KV ラッパ
+│   ├── kv.ts                       # Upstash Redis ラッパ
 │   ├── db.ts                       # Drizzle (Neon)
 │   └── geo.ts                      # bbox / 都道府県判定
 ├── db/
@@ -207,7 +205,7 @@ pnpm poll:once    # GBFS を 1 回ポーリング (確認用)
 ## 本番デプロイ (Vercel)
 
 1. Vercel に新規プロジェクトとして接続
-2. Storage タブで **KV** と **Postgres** を作成 → 環境変数が自動注入される
+2. Storage → Marketplace から **Upstash for Redis** と **Neon Postgres** を Install → 環境変数が自動注入される
 3. プロジェクト設定の Environment Variables に以下を追加:
    - `ODPT_CONSUMER_KEY`
    - `CRON_SECRET` (任意の長い文字列)

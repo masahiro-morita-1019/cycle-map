@@ -1,7 +1,15 @@
-import { kv } from "@vercel/kv";
+import { Redis } from "@upstash/redis";
 import type { Provider, StationStatus } from "./gbfs/types";
 
 const STATUS_TTL_SECONDS = 60 * 10; // 10 min — much longer than poll cadence so stale-while-revalidate works
+
+let _redis: Redis | null = null;
+
+function redis(): Redis {
+  if (_redis) return _redis;
+  _redis = Redis.fromEnv();
+  return _redis;
+}
 
 function statusKey(provider: Provider) {
   return `station_status:${provider}`;
@@ -14,7 +22,7 @@ export type StatusSnapshot = {
 };
 
 export async function writeStatusSnapshot(snapshot: StatusSnapshot) {
-  await kv.set(statusKey(snapshot.provider), snapshot, {
+  await redis().set(statusKey(snapshot.provider), snapshot, {
     ex: STATUS_TTL_SECONDS,
   });
 }
@@ -22,7 +30,7 @@ export async function writeStatusSnapshot(snapshot: StatusSnapshot) {
 export async function readStatusSnapshot(
   provider: Provider,
 ): Promise<StatusSnapshot | null> {
-  return (await kv.get<StatusSnapshot>(statusKey(provider))) ?? null;
+  return (await redis().get<StatusSnapshot>(statusKey(provider))) ?? null;
 }
 
 export async function readAllStatusSnapshots(
