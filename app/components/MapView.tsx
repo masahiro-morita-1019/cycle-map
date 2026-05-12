@@ -18,6 +18,7 @@ const STYLE_URL = (() => {
 
 const FALLBACK_STYLE: maplibregl.StyleSpecification = {
   version: 8,
+  glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
   sources: {
     osm: {
       type: "raster",
@@ -106,7 +107,11 @@ export function MapView() {
         type: "symbol",
         source: "stations",
         filter: ["has", "point_count"],
-        layout: { "text-field": "{point_count_abbreviated}", "text-size": 12 },
+        layout: {
+          "text-field": "{point_count_abbreviated}",
+          "text-size": 12,
+          "text-font": ["Open Sans Regular"],
+        },
         paint: { "text-color": "#fff" },
       });
       map.addLayer({
@@ -213,7 +218,9 @@ export function MapView() {
 
   return (
     <>
-      <div ref={containerRef} className="absolute inset-0" />
+      <div className="absolute inset-0">
+        <div ref={containerRef} className="h-full w-full" />
+      </div>
       <div className="absolute left-3 top-3 z-10">
         <ServiceFilter
           services={state.services}
