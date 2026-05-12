@@ -43,9 +43,36 @@ MVP のコードは実装済み。ローカルで地図 UI が動作すること
 
 - 連絡先メールアドレス: `app/components/About.tsx:6` の `contact@example.com` を実アドレスに差し替え
 - Protomaps API キー: 設定すれば見た目が綺麗になる (未設定なら OSM raster でも動作)
-- 都道府県境界 GeoJSON: `public/prefectures.json` を配置するとコロプレス機能が有効化
-- フェーズ3候補 (LUUP / PiPPA / COGICOGI / ecobike) の GBFS 提供状況調査
-- ドコモのエリア拡張 (横浜・川崎・仙台・広島) の取得元調査
+
+---
+
+## 調査メモ (2026-05 時点)
+
+### フェーズ3 候補サービスの GBFS 提供状況
+
+| サービス | 公式 GBFS | 取得元 | 備考 |
+|---|---|---|---|
+| LUUP | × | — | Google Maps 経由のみ。公式オープンデータなし |
+| PiPPA | × | — | mixway API がサポートと言及あるが、ヴァル研究所が独自取得している可能性。公式 GBFS は未確認 |
+| COGICOGI | × | — | 公開オープンデータなし |
+| ecobike | × | — | 公開オープンデータなし |
+
+→ HELLO CYCLING / ドコモ以外で ODPT 経由 GBFS 提供は現状なし。フェーズ3 で追加するには各社と個別交渉、または非公式スクレイピングが必要。
+
+### ドコモ・バイクシェアのエリアカバレッジ
+
+- ODPT に **全国版エンドポイント** (`docomo-cycle`) が存在することを確認
+- 約 3,000 ポート分のデータが含まれる (2023/11 時点、東京・横浜・川崎・仙台・広島・奈良・沖縄等)
+- 本アプリの デフォルト `ODPT_DOCOMO_SYSTEM_ID` は `docomo-cycle` (全国版) に設定済み
+- 東京限定にしたい場合は `.env.local` で `ODPT_DOCOMO_SYSTEM_ID=docomo-cycle-tokyo` で上書き可能
+
+### 都道府県境界 GeoJSON
+
+- `public/prefectures.json` 配置済み (188KB、47都道府県、5% 簡略化)
+- ソース: <https://github.com/dataofjapan/land> の `japan.geojson`
+- 再生成は `pnpm build:prefectures` (環境変数 `SIMPLIFY=10%` 等で簡略化率変更可)
+- 各 Feature の `properties.pref_code` = JIS 都道府県コード ("01"〜"47")
+- [lib/geo.ts](lib/geo.ts) の `prefectureCodeAt(lat, lon)` で point-in-polygon 判定 (東京駅・大阪駅・那覇空港等で動作確認済み)
 
 ---
 

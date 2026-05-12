@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { PROVIDERS, fetchInformation } from "@/lib/providers";
 import { normalizeStations } from "@/lib/gbfs/normalize";
 import { db, schema } from "@/lib/db";
-import { approxPrefectureCode } from "@/lib/geo";
+import { prefectureCodeAt } from "@/lib/geo";
 import type { Provider } from "@/lib/gbfs/types";
 
 export const runtime = "nodejs";
@@ -46,7 +46,7 @@ async function refreshProvider(provider: Provider) {
     lat: s.lat,
     lon: s.lon,
     capacity: s.capacity,
-    prefectureCode: approxPrefectureCode(s.lat, s.lon),
+    prefectureCode: prefectureCodeAt(s.lat, s.lon),
   }));
 
   await db
