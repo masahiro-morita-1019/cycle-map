@@ -11,6 +11,8 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const CACHE_CONTROL = "public, s-maxage=180, stale-while-revalidate=300";
+
 /**
  * 個別ステーションの詳細情報を返す。
  * id は "{provider}:{station_id}" 形式。
@@ -54,7 +56,7 @@ export async function GET(
 
   return NextResponse.json(station, {
     headers: {
-      "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+      "Cache-Control": CACHE_CONTROL,
     },
   });
 }
