@@ -49,20 +49,24 @@ async function refreshProvider(provider: Provider) {
     prefectureCode: prefectureCodeAt(s.lat, s.lon),
   }));
 
-  await db
-    .insert(schema.stations)
-    .values(rows)
-    .onConflictDoUpdate({
-      target: schema.stations.id,
-      set: {
-        name: sql`excluded.name`,
-        lat: sql`excluded.lat`,
-        lon: sql`excluded.lon`,
-        capacity: sql`excluded.capacity`,
-        prefectureCode: sql`excluded.prefecture_code`,
-        updatedAt: sql`now()`,
-      },
-    });
+  // Neon HTTP driver has a payload size limit, so upsert in batches.
+  const BATCH = 500;
+  for (let i = 0; i < rows.length; i += BATCH) {
+    await db
+      .insert(schema.stations)
+      .values(rows.slice(i, i + BATCH))
+      .onConflictDoUpdate({
+        target: schema.stations.id,
+        set: {
+          name: sql`excluded.name`,
+          lat: sql`excluded.lat`,
+          lon: sql`excluded.lon`,
+          capacity: sql`excluded.capacity`,
+          prefectureCode: sql`excluded.prefecture_code`,
+          updatedAt: sql`now()`,
+        },
+      });
+  }
 
   return { count: stations.length };
 }

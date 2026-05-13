@@ -80,54 +80,24 @@ export function MapView() {
       map.addSource("stations", {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
-        cluster: true,
-        clusterMaxZoom: 14,
-        clusterRadius: 40,
+        // TODO: クラスタリングは MapLibre worker の初期化問題で一旦無効化。
+        // 後で setWorkerUrl / setWorkerCount(0) などで解決する。
+        cluster: false,
       });
 
-      map.addLayer({
-        id: "clusters",
-        type: "circle",
-        source: "stations",
-        filter: ["has", "point_count"],
-        paint: {
-          "circle-color": "#1e88e5",
-          "circle-opacity": 0.75,
-          "circle-radius": [
-            "step",
-            ["get", "point_count"],
-            14, 10, 18, 50, 24, 200, 30,
-          ],
-          "circle-stroke-width": 2,
-          "circle-stroke-color": "#0b0d10",
-        },
-      });
-      map.addLayer({
-        id: "cluster-count",
-        type: "symbol",
-        source: "stations",
-        filter: ["has", "point_count"],
-        layout: {
-          "text-field": "{point_count_abbreviated}",
-          "text-size": 12,
-          "text-font": ["Open Sans Regular"],
-        },
-        paint: { "text-color": "#fff" },
-      });
       map.addLayer({
         id: "stations-point",
         type: "circle",
         source: "stations",
-        filter: ["!", ["has", "point_count"]],
         paint: {
-          "circle-radius": 7,
+          "circle-radius": 6,
           "circle-color": [
             "case",
             ["==", ["get", "bikes"], 0], "#ef4444",
             ["<", ["get", "bikes"], 3], "#f59e0b",
             "#22c55e",
           ],
-          "circle-stroke-width": 2,
+          "circle-stroke-width": 1.5,
           "circle-stroke-color": "#0b0d10",
         },
       });
@@ -151,22 +121,9 @@ export function MapView() {
           .addTo(map);
         popupRef.current = popup;
       });
-      map.on("click", "clusters", (e) => {
-        const f = e.features?.[0];
-        if (!f || f.geometry.type !== "Point") return;
-        const coords = f.geometry.coordinates as [number, number];
-        const src = map.getSource("stations") as GeoJSONSource;
-        const clusterId = f.properties?.cluster_id as number | undefined;
-        if (clusterId == null) return;
-        src.getClusterExpansionZoom(clusterId).then((zoom) => {
-          map.easeTo({ center: coords, zoom });
-        });
-      });
       const setCursor = (cursor: string) => (map.getCanvas().style.cursor = cursor);
       map.on("mouseenter", "stations-point", () => setCursor("pointer"));
       map.on("mouseleave", "stations-point", () => setCursor(""));
-      map.on("mouseenter", "clusters", () => setCursor("pointer"));
-      map.on("mouseleave", "clusters", () => setCursor(""));
 
       updateBboxFromMap();
       attachCoverageLayer(map).catch((err) =>
