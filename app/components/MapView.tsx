@@ -4,11 +4,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import maplibregl, { type GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { ServiceFilter } from "./ServiceFilter";
-import { renderStationPopupHtml } from "./StationPopup";
+import {
+  renderStationPopupHtml,
+  renderStationPopupLoadingHtml,
+} from "./StationPopup";
 import { attachCoverageLayer } from "./CoverageLayer";
-import { PROVIDER_LABEL, type Provider, type StationWithStatus } from "@/lib/gbfs/types";
+import {
+  PROVIDER_LABEL,
+  type Provider,
+  type StationLite,
+  type StationWithStatus,
+} from "@/lib/gbfs/types";
 import { useUrlState } from "../hooks/useUrlState";
 import { useStations } from "../hooks/useStations";
+
+// TODO: クラスタリング再有効化は別 commit で対応。
+// Next.js dev で MapLibre worker URL 解決が壊れて actor 起動に失敗するため、
+// public/ に worker JS をコピーする postinstall スクリプトを足す必要がある。
 
 const STYLE_URL = (() => {
   const key = process.env.NEXT_PUBLIC_PROTOMAPS_API_KEY;
@@ -38,7 +50,7 @@ export function MapView() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
-  const stationsRef = useRef<StationWithStatus[]>([]);
+  const popupAbortRef = useRef<AbortController | null>(null);
 
   const { state, setState } = useUrlState({
     lat: DEFAULT_CENTER[1],
@@ -49,9 +61,6 @@ export function MapView() {
   const [bbox, setBbox] = useState<[number, number, number, number] | null>(null);
 
   const stations = useStations(bbox, state.services);
-  useEffect(() => {
-    stationsRef.current = stations;
-  }, [stations]);
 
   // Init map once
   useEffect(() => {
@@ -80,8 +89,6 @@ export function MapView() {
       map.addSource("stations", {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
-        // TODO: クラスタリングは MapLibre worker の初期化問題で一旦無効化。
-        // 後で setWorkerUrl / setWorkerCount(0) などで解決する。
         cluster: false,
       });
 
@@ -90,15 +97,23 @@ export function MapView() {
         type: "circle",
         source: "stations",
         paint: {
-          "circle-radius": 6,
+          "circle-radius": 7,
+          // 塗り = プロバイダ識別
           "circle-color": [
-            "case",
-            ["==", ["get", "bikes"], 0], "#ef4444",
-            ["<", ["get", "bikes"], 3], "#f59e0b",
-            "#22c55e",
+            "match",
+            ["get", "provider"],
+            "hellocycling", "#3b82f6", // 青
+            "docomo", "#ef4444",        // 赤
+            "#9ca3af",                  // fallback
           ],
-          "circle-stroke-width": 1.5,
-          "circle-stroke-color": "#0b0d10",
+          // ストローク = 空き状況 (太めで識別しやすく)
+          "circle-stroke-width": 3,
+          "circle-stroke-color": [
+            "case",
+            ["==", ["get", "bikes"], 0], "#374151", // 空き0 = 濃灰
+            ["<", ["get", "bikes"], 3], "#fbbf24",  // 少ない = 黄
+            "#22c55e",                                // 十分 = 緑
+          ],
         },
       });
 
@@ -106,22 +121,46 @@ export function MapView() {
         const f = e.features?.[0];
         if (!f || f.geometry.type !== "Point") return;
         const id = String(f.properties?.id ?? "");
-        const station = stationsRef.current.find((s) => s.id === id);
-        if (!station) return;
+        const coords = f.geometry.coordinates as [number, number];
+        if (!id) return;
 
+        // 既存のポップアップと進行中の fetch を破棄
         popupRef.current?.remove();
+        popupAbortRef.current?.abort();
+
         const popup = new maplibregl.Popup({
           offset: 12,
           maxWidth: "320px",
           closeButton: true,
           closeOnClick: true,
         })
-          .setLngLat([station.lon, station.lat])
-          .setHTML(renderStationPopupHtml(station))
+          .setLngLat(coords)
+          .setHTML(renderStationPopupLoadingHtml())
           .addTo(map);
         popupRef.current = popup;
+
+        const controller = new AbortController();
+        popupAbortRef.current = controller;
+
+        fetch(`/api/stations/${encodeURIComponent(id)}`, {
+          signal: controller.signal,
+        })
+          .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+          .then((detail: StationWithStatus) => {
+            // ポップアップが閉じられていたら何もしない
+            if (popupRef.current !== popup) return;
+            popup.setHTML(renderStationPopupHtml(detail));
+          })
+          .catch((err) => {
+            if ((err as { name?: string }).name === "AbortError") return;
+            if (popupRef.current !== popup) return;
+            popup.setHTML(
+              `<div class="cm-popup"><div class="cm-popup__name">読み込みに失敗しました</div></div>`,
+            );
+          });
       });
-      const setCursor = (cursor: string) => (map.getCanvas().style.cursor = cursor);
+      const setCursor = (cursor: string) =>
+        (map.getCanvas().style.cursor = cursor);
       map.on("mouseenter", "stations-point", () => setCursor("pointer"));
       map.on("mouseleave", "stations-point", () => setCursor(""));
 
@@ -141,6 +180,7 @@ export function MapView() {
 
     mapRef.current = map;
     return () => {
+      popupAbortRef.current?.abort();
       map.remove();
       mapRef.current = null;
       popupRef.current = null;
@@ -190,7 +230,7 @@ export function MapView() {
 }
 
 function toFeatureCollection(
-  stations: StationWithStatus[],
+  stations: StationLite[],
 ): GeoJSON.FeatureCollection<GeoJSON.Point> {
   return {
     type: "FeatureCollection",
@@ -200,7 +240,7 @@ function toFeatureCollection(
       properties: {
         id: s.id,
         provider: s.provider,
-        bikes: s.status?.numBikesAvailable ?? 0,
+        bikes: s.bikes,
       },
     })),
   };

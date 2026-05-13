@@ -6,8 +6,7 @@ import { readAllStatusSnapshots } from "@/lib/kv";
 import {
   ProviderSchema,
   type Provider,
-  type StationStatus,
-  type StationWithStatus,
+  type StationLite,
 } from "@/lib/gbfs/types";
 
 export const runtime = "nodejs";
@@ -31,7 +30,12 @@ export async function GET(req: NextRequest) {
   }
 
   const rows = await db
-    .select()
+    .select({
+      id: schema.stations.id,
+      provider: schema.stations.provider,
+      lat: schema.stations.lat,
+      lon: schema.stations.lon,
+    })
     .from(schema.stations)
     .where(
       and(
@@ -45,21 +49,17 @@ export async function GET(req: NextRequest) {
     .limit(MAX_RESULTS);
 
   const snapshots = await readAllStatusSnapshots(providers);
-  const statusById = new Map<string, StationStatus>();
+  const bikesById = new Map<string, number>();
   for (const snap of snapshots.values()) {
-    for (const s of snap.statuses) statusById.set(s.id, s);
+    for (const s of snap.statuses) bikesById.set(s.id, s.numBikesAvailable);
   }
 
-  const stations: StationWithStatus[] = rows.map((r) => ({
+  const stations: StationLite[] = rows.map((r) => ({
     id: r.id,
     provider: r.provider as Provider,
-    stationId: r.stationId,
-    name: r.name,
     lat: r.lat,
     lon: r.lon,
-    capacity: r.capacity,
-    staticUpdatedAt: r.updatedAt.toISOString(),
-    status: statusById.get(r.id) ?? null,
+    bikes: bikesById.get(r.id) ?? 0,
   }));
 
   return NextResponse.json(

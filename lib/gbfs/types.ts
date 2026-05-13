@@ -75,3 +75,18 @@ export type StationWithStatus = Station & {
   staticUpdatedAt: string;
   status: StationStatus | null;
 };
+
+/**
+ * 地図への描画だけに必要な最小フィールド。
+ * 一覧 API (/api/stations) のレスポンス。
+ * 詳細 (name / capacity / docks / lastReported) はクリック時に
+ * /api/stations/[id] で別途取得する。
+ */
+export type StationLite = {
+  id: string;
+  provider: Provider;
+  lat: number;
+  lon: number;
+  /** num_bikes_available。status 未取得時は 0。 */
+  bikes: number;
+};

@@ -1,5 +1,14 @@
 import { PROVIDER_LABEL, type StationWithStatus } from "@/lib/gbfs/types";
 
+export function renderStationPopupLoadingHtml(): string {
+  return `
+    <div class="cm-popup">
+      <div class="cm-popup__name">読み込み中…</div>
+      <div class="cm-popup__notice">ポートの詳細情報を取得しています。</div>
+    </div>
+  `;
+}
+
 export function renderStationPopupHtml(s: StationWithStatus): string {
   const bikes = s.status?.numBikesAvailable ?? null;
   const docks = s.status?.numDocksAvailable ?? null;

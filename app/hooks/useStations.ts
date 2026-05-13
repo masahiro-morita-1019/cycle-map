@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Provider, StationWithStatus } from "@/lib/gbfs/types";
+import type { Provider, StationLite } from "@/lib/gbfs/types";
 
-const FETCH_DEBOUNCE_MS = 250;
+const FETCH_DEBOUNCE_MS = 400;
 
 export function useStations(
   bbox: [number, number, number, number] | null,
   services: Provider[],
-): StationWithStatus[] {
-  const [stations, setStations] = useState<StationWithStatus[]>([]);
+): StationLite[] {
+  const [stations, setStations] = useState<StationLite[]>([]);
   const bboxKey = bbox ? bbox.map((n) => n.toFixed(4)).join(",") : "";
   const servicesKey = services.join(",");
 
@@ -29,7 +29,7 @@ export function useStations(
           signal: controller.signal,
         });
         if (!res.ok) return;
-        const data = (await res.json()) as { stations: StationWithStatus[] };
+        const data = (await res.json()) as { stations: StationLite[] };
         setStations(data.stations);
       } catch (err) {
         if ((err as { name?: string }).name !== "AbortError") {
