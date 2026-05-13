@@ -36,7 +36,7 @@ MVP のコードは実装済み。ローカルで地図 UI が動作すること
 6. 確認できたら Vercel に本番デプロイ
    - Vercel プロジェクト作成 → GitHub 連携 (リポジトリは <https://github.com/masahiro-morita-1019/cycle-map>)
    - Vercel 環境変数に `ODPT_CONSUMER_KEY` と `CRON_SECRET` (`openssl rand -base64 32` で生成) を追加
-   - 初回デプロイ後、Cron Jobs タブで `/api/cron/poll` (`*/2 * * * *`) と `/api/cron/refresh-static` (`0 3 * * *`) が登録されていることを確認
+   - 初回デプロイ後、Cron Jobs タブで `/api/cron/refresh-static` (`0 3 * * *`) と `/api/cron/poll` (`0 4 * * *`) が登録されていることを確認
    - `/api/cron/refresh-static` を手動実行してテーブルを埋める
 
 ### 任意で後回しになっている項目
@@ -276,11 +276,14 @@ pnpm poll:once    # GBFS を 1 回ポーリング (確認用)
    - `NEXT_PUBLIC_PROTOMAPS_API_KEY` (任意)
 4. Deploy
 5. 初回デプロイ後、Vercel ダッシュボードの Cron Jobs タブで以下が登録されていることを確認:
-   - `/api/cron/poll` (`*/2 * * * *`)
    - `/api/cron/refresh-static` (`0 3 * * *`)
+   - `/api/cron/poll` (`0 4 * * *`)
 6. 任意で `/api/cron/refresh-static` を 1 回手動実行してテーブルを埋める
 
-> **注意**: Vercel Hobby プランは Cron が日次のみ。分単位で叩きたい場合は Pro 以上が必要。
+> **注意**: Vercel Hobby プランは Cron が日次のみ。分単位の cron expression は
+> deployment 自体が失敗するため、本番設定では `/api/cron/poll` も日次 (`0 4 * * *`)
+> にしている。数分単位の鮮度が必要になったら Pro 以上へ上げるか、外部 cron サービスから
+> `/api/cron/poll` を `Authorization: Bearer $CRON_SECRET` で叩く。
 
 ---
 
@@ -315,6 +318,6 @@ UI フッターに「出典: 公共交通オープンデータセンター (CC B
 | `ODPT_CONSUMER_KEY is not set` | `.env.local` を作成し ODPT トークンを設定 |
 | `DATABASE_URL is not set` | Neon Postgres を作成し接続文字列を設定 |
 | 地図は出るがポートが表示されない | `pnpm poll:once` を 1 回実行してデータを入れる / DevTools の `/api/stations` レスポンスを確認 |
-| Vercel Cron が動かない | プランが Hobby の場合は分単位 Cron 不可。Pro 以上にアップグレードするか、外部の cron サービスから `/api/cron/poll` を `Authorization: Bearer $CRON_SECRET` で叩く |
+| Vercel deployment が Cron Jobs で失敗する | Hobby プランでは分単位 Cron 不可。`vercel.json` の cron は日次にする。数分単位にしたい場合は Pro 以上にアップグレードするか、外部 cron サービスから `/api/cron/poll` を `Authorization: Bearer $CRON_SECRET` で叩く |
 | ポートが大量に表示されて重い | クラスタリングはズーム 14 以下で有効。`MapView.tsx` の `clusterMaxZoom` を調整 |
 | 都道府県カバレッジが出ない | `public/prefectures.json` を配置する (上記セットアップ手順 6 を参照) |

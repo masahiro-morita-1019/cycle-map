@@ -63,7 +63,7 @@ maplibregl.setWorkerUrl("/maplibre-gl-csp-worker.js");
 
 - **連絡先メールアドレス**: [app/components/About.tsx:6](app/components/About.tsx) の `contact@example.com` を実アドレスに差し替え
 - **Protomaps API キー**: 未設定なら OSM ラスタ動作。設定すれば見た目が綺麗に
-- **本番 Vercel デプロイ**: GitHub 連携と環境変数の登録のみ。手順は [README.md](README.md) の「再開チェックリスト」参照。`CRON_SECRET` は Vercel 側で `openssl rand -base64 32` で生成して登録
+- **本番 Vercel デプロイ**: GitHub 連携と環境変数の登録のみ。手順は [README.md](README.md) の「再開チェックリスト」参照。`CRON_SECRET` は Vercel 側で `openssl rand -base64 32` で生成して登録。Vercel Hobby は分単位 Cron で deployment が失敗するため、`vercel.json` は日次 Cron にしている。
 - **ベクタータイル化** (将来): MVT を生成してサーバ側で配信すれば、クライアントは bbox に関係なくタイル単位で描画。ベスト構成だが実装数日規模
 
 ---
