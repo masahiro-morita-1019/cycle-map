@@ -91,6 +91,14 @@ export function AboutModal() {
                 </li>
               </ul>
 
+              <h3 className="mt-3 font-semibold text-white">広告について</h3>
+              <p>
+                本サイトは Google AdSense を含む第三者配信の広告サービスを
+                利用しており、また Amazon.co.jp 等のアフィリエイトプログラムにも
+                参加しています。掲載商品の購入により運営者が報酬を得る場合が
+                あります。
+              </p>
+
               <h3 className="mt-3 font-semibold text-white">免責事項</h3>
               <p>
                 表示されるデータは公共交通オープンデータセンターから取得していますが、その
