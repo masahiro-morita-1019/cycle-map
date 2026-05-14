@@ -36,7 +36,7 @@ export function AboutModal() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-start justify-between">
-              <h2 className="text-base font-semibold">このサイトについて</h2>
+              <h2 className="text-base font-semibold">Portly (ポートリー) について</h2>
               <button
                 onClick={() => setOpen(false)}
                 aria-label="閉じる"
@@ -48,8 +48,9 @@ export function AboutModal() {
 
             <section className="space-y-3 leading-relaxed text-neutral-300">
               <p>
-                本サイトは、HELLO CYCLING およびドコモ・バイクシェアのシェアサイクルポート情報を地図上で
-                横断的に検索・閲覧できる Web アプリです。
+                <strong className="text-white">Portly (ポートリー)</strong> は、
+                HELLO CYCLING およびドコモ・バイクシェアのシェアサイクルポート情報を
+                地図上で横断的に検索・閲覧できる無料 Web アプリです。
               </p>
 
               <h3 className="mt-3 font-semibold text-white">データの出典</h3>
