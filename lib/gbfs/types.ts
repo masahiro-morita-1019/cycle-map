@@ -8,6 +8,12 @@ export const PROVIDER_LABEL: Record<Provider, string> = {
   docomo: "ドコモ・バイクシェア",
 };
 
+/** 各サービスのブランドカラー (地図マーカー / 凡例で共通使用)。 */
+export const PROVIDER_COLOR: Record<Provider, string> = {
+  hellocycling: "#eab308", // HELLO CYCLING のゴールデンイエロー (yellow-500)
+  docomo: "#dc2626", // ドコモレッド (red-600)
+};
+
 // GBFS spec subsets we depend on
 export const GbfsStationInformationSchema = z.object({
   data: z.object({

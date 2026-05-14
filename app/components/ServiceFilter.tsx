@@ -1,6 +1,6 @@
 "use client";
 
-import type { Provider } from "@/lib/gbfs/types";
+import { PROVIDER_COLOR, type Provider } from "@/lib/gbfs/types";
 
 type Props = {
   services: Provider[];
@@ -29,6 +29,11 @@ export function ServiceFilter({ services, labels, onToggle }: Props) {
                 className="accent-blue-500"
                 checked={on}
                 onChange={() => onToggle(p)}
+              />
+              <span
+                aria-hidden
+                className="inline-block h-3 w-3 shrink-0 rounded-full ring-1 ring-white/30"
+                style={{ backgroundColor: PROVIDER_COLOR[p] }}
               />
               <span className={on ? "text-white" : "text-neutral-400"}>
                 {labels[p]}

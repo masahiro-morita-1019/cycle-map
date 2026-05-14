@@ -11,6 +11,7 @@ import {
 import { attachCoverageLayer, COVERAGE_MAX_ZOOM } from "./CoverageLayer";
 import { CoverageLegend } from "./CoverageLegend";
 import {
+  PROVIDER_COLOR,
   PROVIDER_LABEL,
   type Provider,
   type StationLite,
@@ -99,15 +100,7 @@ export function MapView() {
         source: "stations",
         filter: ["has", "point_count"],
         paint: {
-          "circle-color": [
-            "step",
-            ["get", "point_count"],
-            "#38bdf8",
-            25,
-            "#facc15",
-            100,
-            "#fb7185",
-          ],
+          "circle-color": "#38bdf8",
           "circle-radius": [
             "step",
             ["get", "point_count"],
@@ -144,13 +137,13 @@ export function MapView() {
         filter: ["!", ["has", "point_count"]],
         paint: {
           "circle-radius": 7,
-          // 塗り = プロバイダ識別
+          // 塗り = プロバイダ識別 (ブランドカラー)
           "circle-color": [
             "match",
             ["get", "provider"],
-            "hellocycling", "#3b82f6", // 青
-            "docomo", "#ef4444",        // 赤
-            "#9ca3af",                  // fallback
+            "hellocycling", PROVIDER_COLOR.hellocycling,
+            "docomo", PROVIDER_COLOR.docomo,
+            "#9ca3af",
           ],
           // ストローク = 空き状況 (太めで識別しやすく)
           "circle-stroke-width": 3,
