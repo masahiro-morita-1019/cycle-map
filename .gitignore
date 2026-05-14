@@ -13,6 +13,8 @@ dist/
 npm-debug.log*
 pnpm-debug.log*
 
+public/maplibre-gl-csp-worker.js
+
 .vercel
 .turbo
 

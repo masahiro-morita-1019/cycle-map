@@ -11,6 +11,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
+    "postinstall": "node scripts/copy-maplibre-worker.mjs",
     "poll:once": "tsx scripts/poll-once.ts",
     "build:prefectures": "tsx scripts/build-prefectures.ts"
   },

@@ -18,10 +18,6 @@ import {
 import { useUrlState } from "../hooks/useUrlState";
 import { useStations } from "../hooks/useStations";
 
-// TODO: クラスタリング再有効化は別 commit で対応。
-// Next.js dev で MapLibre worker URL 解決が壊れて actor 起動に失敗するため、
-// public/ に worker JS をコピーする postinstall スクリプトを足す必要がある。
-
 const STYLE_URL = (() => {
   const key = process.env.NEXT_PUBLIC_PROTOMAPS_API_KEY;
   if (key) return `https://api.protomaps.com/styles/v5/dark/en?key=${key}`;
@@ -66,6 +62,8 @@ export function MapView() {
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
+    maplibregl.setWorkerUrl("/maplibre-gl-csp-worker.js");
+
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: STYLE_URL ?? FALLBACK_STYLE,
@@ -89,13 +87,60 @@ export function MapView() {
       map.addSource("stations", {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
-        cluster: false,
+        cluster: true,
+        clusterMaxZoom: 14,
+        clusterRadius: 48,
+      });
+
+      map.addLayer({
+        id: "stations-cluster",
+        type: "circle",
+        source: "stations",
+        filter: ["has", "point_count"],
+        paint: {
+          "circle-color": [
+            "step",
+            ["get", "point_count"],
+            "#38bdf8",
+            25,
+            "#facc15",
+            100,
+            "#fb7185",
+          ],
+          "circle-radius": [
+            "step",
+            ["get", "point_count"],
+            18,
+            25,
+            24,
+            100,
+            32,
+          ],
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff",
+        },
+      });
+
+      map.addLayer({
+        id: "stations-cluster-count",
+        type: "symbol",
+        source: "stations",
+        filter: ["has", "point_count"],
+        layout: {
+          "text-field": "{point_count_abbreviated}",
+          "text-font": ["Noto Sans Regular"],
+          "text-size": 12,
+        },
+        paint: {
+          "text-color": "#111827",
+        },
       });
 
       map.addLayer({
         id: "stations-point",
         type: "circle",
         source: "stations",
+        filter: ["!", ["has", "point_count"]],
         paint: {
           "circle-radius": 7,
           // 塗り = プロバイダ識別
@@ -115,6 +160,28 @@ export function MapView() {
             "#22c55e",                                // 十分 = 緑
           ],
         },
+      });
+
+      const zoomIntoCluster = async (f: maplibregl.MapGeoJSONFeature) => {
+        if (!f || f.geometry.type !== "Point") return;
+
+        const clusterId = Number(f.properties?.cluster_id);
+        if (!Number.isFinite(clusterId)) return;
+
+        const src = map.getSource("stations") as GeoJSONSource | undefined;
+        if (!src) return;
+
+        const zoom = await src.getClusterExpansionZoom(clusterId);
+        map.easeTo({
+          center: f.geometry.coordinates as [number, number],
+          zoom,
+        });
+      };
+      map.on("click", async (e) => {
+        const cluster = map.queryRenderedFeatures(e.point, {
+          layers: ["stations-cluster-count", "stations-cluster"],
+        })[0];
+        if (cluster) await zoomIntoCluster(cluster);
       });
 
       map.on("click", "stations-point", (e) => {
@@ -161,6 +228,12 @@ export function MapView() {
       });
       const setCursor = (cursor: string) =>
         (map.getCanvas().style.cursor = cursor);
+      map.on("mouseenter", "stations-cluster", () => setCursor("pointer"));
+      map.on("mouseleave", "stations-cluster", () => setCursor(""));
+      map.on("mouseenter", "stations-cluster-count", () =>
+        setCursor("pointer"),
+      );
+      map.on("mouseleave", "stations-cluster-count", () => setCursor(""));
       map.on("mouseenter", "stations-point", () => setCursor("pointer"));
       map.on("mouseleave", "stations-point", () => setCursor(""));
 
