@@ -8,7 +8,8 @@ import {
   renderStationPopupHtml,
   renderStationPopupLoadingHtml,
 } from "./StationPopup";
-import { attachCoverageLayer } from "./CoverageLayer";
+import { attachCoverageLayer, COVERAGE_MAX_ZOOM } from "./CoverageLayer";
+import { CoverageLegend } from "./CoverageLegend";
 import {
   PROVIDER_LABEL,
   type Provider,
@@ -291,12 +292,13 @@ export function MapView() {
       <div className="absolute inset-0">
         <div ref={containerRef} className="h-full w-full" />
       </div>
-      <div className="absolute left-3 top-3 z-10">
+      <div className="absolute left-3 top-3 z-10 flex flex-col gap-2">
         <ServiceFilter
           services={state.services}
           labels={PROVIDER_LABEL}
           onToggle={onToggleService}
         />
+        {state.zoom < COVERAGE_MAX_ZOOM ? <CoverageLegend /> : null}
       </div>
     </>
   );

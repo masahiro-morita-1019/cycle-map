@@ -1,6 +1,19 @@
 import type maplibregl from "maplibre-gl";
 import type { CoverageRow } from "../api/coverage/route";
 
+/** コロプレスを描画する最大ズーム。これ以上ズームインすると個別マーカー表示。 */
+export const COVERAGE_MAX_ZOOM = 8;
+
+/** 凡例 (CoverageLegend) と paint expression で同じ値を使うための共通定数。 */
+export const COVERAGE_COLORS = {
+  both: "#22c55e", // 両サービスあり (緑)
+  hello: "#86efac", // HELLO CYCLING のみ (薄緑)
+  docomo: "#fbbf24", // ドコモのみ (黄)
+  none: "#374151", // 提供なし (濃灰)
+} as const;
+
+export type CoverageStatus = keyof typeof COVERAGE_COLORS;
+
 /**
  * 都道府県カバレッジ (コロプレス) レイヤーをマップに追加する。
  *
@@ -62,15 +75,15 @@ export async function attachCoverageLayer(map: maplibregl.Map) {
         id: "prefectures-fill",
         type: "fill",
         source: "prefectures",
-        maxzoom: 8,
+        maxzoom: COVERAGE_MAX_ZOOM,
         paint: {
           "fill-color": [
             "match",
             ["get", "status"],
-            "both", "#22c55e",
-            "hello", "#86efac",
-            "docomo", "#fbbf24",
-            "#374151",
+            "both", COVERAGE_COLORS.both,
+            "hello", COVERAGE_COLORS.hello,
+            "docomo", COVERAGE_COLORS.docomo,
+            COVERAGE_COLORS.none,
           ],
           "fill-opacity": 0.45,
         },
@@ -84,7 +97,7 @@ export async function attachCoverageLayer(map: maplibregl.Map) {
         id: "prefectures-line",
         type: "line",
         source: "prefectures",
-        maxzoom: 8,
+        maxzoom: COVERAGE_MAX_ZOOM,
         paint: { "line-color": "#0b0d10", "line-width": 0.5 },
       },
       "stations-point",
