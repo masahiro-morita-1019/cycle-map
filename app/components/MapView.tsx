@@ -42,7 +42,7 @@ const FALLBACK_STYLE: maplibregl.StyleSpecification = {
 };
 
 const DEFAULT_CENTER: [number, number] = [139.7671, 35.6812]; // 東京駅
-const DEFAULT_ZOOM = 12;
+const DEFAULT_ZOOM = 7;
 
 export function MapView() {
   const containerRef = useRef<HTMLDivElement | null>(null);
