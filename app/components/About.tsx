@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-// 仮置きの連絡先。本番運用時に置き換える。
-const CONTACT_EMAIL = "contact@example.com";
+const CONTACT_EMAIL = "contact@portly.jp";
 
 export function AboutModal() {
   const [open, setOpen] = useState(false);

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AboutModal } from "./About";
 
 export function Footer() {
@@ -7,6 +8,18 @@ export function Footer() {
         Portly
       </span>
       <AboutModal />
+      <Link
+        href="/privacy"
+        className="pointer-events-auto rounded bg-neutral-900/70 px-2 py-1 backdrop-blur hover:bg-neutral-900/90"
+      >
+        プライバシー
+      </Link>
+      <Link
+        href="/contact"
+        className="pointer-events-auto rounded bg-neutral-900/70 px-2 py-1 backdrop-blur hover:bg-neutral-900/90"
+      >
+        お問い合わせ
+      </Link>
       <span className="pointer-events-auto rounded bg-neutral-900/70 px-2 py-1 backdrop-blur">
         出典: 公共交通オープンデータセンター ／ CC BY 4.0 ／
         © OpenStreet, ドコモ・バイクシェア

@@ -36,14 +36,7 @@ export function AdSense({
   }, [enabled]);
 
   if (!enabled) {
-    return (
-      <div
-        className={`grid place-items-center text-[10px] text-neutral-500 ${className ?? ""}`}
-        style={style}
-      >
-        広告枠 (未設定)
-      </div>
-    );
+    return <div className={className} style={style} aria-hidden="true" />;
   }
 
   return (

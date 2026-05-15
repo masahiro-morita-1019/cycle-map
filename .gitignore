@@ -20,3 +20,5 @@ public/maplibre-gl-csp-worker.js
 
 next-env.d.ts
 *.tsbuildinfo
+
+.claude/worktrees/
