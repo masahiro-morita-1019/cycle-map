@@ -20,6 +20,14 @@ export function Footer() {
       >
         お問い合わせ
       </Link>
+      <a
+        href="/architecture.html"
+        target="_blank"
+        rel="noopener"
+        className="pointer-events-auto rounded bg-neutral-900/70 px-2 py-1 backdrop-blur hover:bg-neutral-900/90"
+      >
+        しくみ
+      </a>
       <span className="pointer-events-auto rounded bg-neutral-900/70 px-2 py-1 backdrop-blur">
         出典: 公共交通オープンデータセンター ／ CC BY 4.0 ／
         © OpenStreet, ドコモ・バイクシェア

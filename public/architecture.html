@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Portly のしくみ — アーキテクチャと技術選定</title>
+<meta name="robots" content="noindex">
+<style>
+  :root {
+    --accent: #0a8a4a;
+    --accent-soft: #e6f5ed;
+    --ink: #1a2b22;
+    --muted: #5b6b63;
+    --line: #d8e0db;
+    --bg: #fafaf7;
+    --card: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans",
+      "Yu Gothic UI", "Segoe UI", sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.75;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 48px 20px 80px;
+  }
+  header.hero {
+    padding: 64px 20px 48px;
+    background: linear-gradient(180deg, var(--accent-soft) 0%, var(--bg) 100%);
+    text-align: center;
+  }
+  header.hero h1 {
+    font-size: 30px;
+    margin: 0 0 12px;
+    letter-spacing: 0.02em;
+  }
+  header.hero p {
+    margin: 0 auto;
+    max-width: 560px;
+    color: var(--muted);
+    font-size: 15px;
+  }
+  h2 {
+    font-size: 20px;
+    margin: 56px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--accent);
+    display: inline-block;
+  }
+  h3 {
+    font-size: 16px;
+    margin: 28px 0 8px;
+    color: var(--accent);
+  }
+  p { margin: 0 0 14px; }
+  ul { padding-left: 1.2em; margin: 0 0 14px; }
+  li { margin: 4px 0; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px 22px;
+    margin: 16px 0;
+  }
+  .pillars {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin: 16px 0;
+  }
+  .pillar {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .pillar .num {
+    display: inline-block;
+    width: 26px; height: 26px;
+    line-height: 26px;
+    text-align: center;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .pillar h3 { margin: 0 0 6px; color: var(--ink); font-size: 15px; }
+  .pillar p { font-size: 14px; color: var(--muted); margin: 0; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    margin: 12px 0 20px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  th {
+    background: var(--accent-soft);
+    color: var(--ink);
+    font-weight: 600;
+    font-size: 13px;
+  }
+  tr:last-child td { border-bottom: none; }
+  td.layer { white-space: nowrap; color: var(--muted); width: 22%; }
+  td.tech { font-weight: 600; width: 30%; }
+
+  .diagram {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px;
+    margin: 16px 0;
+    overflow-x: auto;
+  }
+  .diagram svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+
+  .flow {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin: 14px 0;
+  }
+  .flow-step {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--accent);
+    border-radius: 8px;
+    padding: 12px 16px;
+  }
+  .flow-step b { color: var(--accent); }
+  .flow-step .when {
+    display: inline-block;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-right: 8px;
+  }
+
+  footer {
+    margin-top: 64px;
+    padding: 24px 20px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13px;
+    text-align: center;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  .note {
+    font-size: 13px;
+    color: var(--muted);
+    border-left: 3px solid var(--line);
+    padding: 4px 12px;
+    margin: 8px 0;
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>Portly のしくみ</h1>
+  <p>サービスを横断してシェアサイクルの<strong>「借りられる・返せる」</strong>を 1 つの地図で見える化する Web アプリ。<br>このページは、その裏側の考え方と技術選定を 5 分でつかむための資料です。</p>
+</header>
+
+<main>
+
+<!-- 1. これは何か -->
+<section>
+  <h2>1. これは何か</h2>
+  <p>Portly は、HELLO CYCLING・ドコモ・バイクシェアなど、別々のアプリに分かれているシェアサイクルのポート (置き場) を、<strong>1 枚の地図でまとめて見られる</strong> Web アプリです。</p>
+
+  <div class="card">
+    <h3>解決したい課題</h3>
+    <ul>
+      <li><strong>サービスが分断されている</strong> — どのアプリを開けば近くにポートがあるか分からない。</li>
+      <li><strong>「返せるか」が見えない</strong> — 借りられても、目的地で返す枠が空いていないと困る。既存アプリは「空き台数」ばかり強調しがち。</li>
+      <li><strong>毎回アプリを入れる気にならない</strong> — 旅行や出張で一度しか使わない人にとってインストールは負担。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 2. 3つのこだわり -->
+<section>
+  <h2>2. 3 つのこだわり</h2>
+  <div class="pillars">
+    <div class="pillar">
+      <span class="num">1</span>
+      <h3>Web 完結</h3>
+      <p>アプリ不要。URL をシェアすれば、相手は開くだけで同じ場所・同じ表示が再現されます。</p>
+    </div>
+    <div class="pillar">
+      <span class="num">2</span>
+      <h3>返却枠を可視化</h3>
+      <p>「貸出可能な台数」だけでなく「返却できる空き枠」も表示。安心して目的地まで走れます。</p>
+    </div>
+    <div class="pillar">
+      <span class="num">3</span>
+      <h3>サービス横断</h3>
+      <p>提供事業者ごとに色で塗り分け。複数サービスを 1 つの地図上で比較できます。</p>
+    </div>
+  </div>
+</section>
+
+<!-- 3. アーキテクチャ図 -->
+<section>
+  <h2>3. 全体のしくみ (図)</h2>
+  <p>外部のオープンデータを定期的に取り込み、データベースとキャッシュに整え、ブラウザの地図で表示する、というシンプルな流れです。</p>
+
+  <div class="diagram" aria-label="データフロー図">
+    <svg viewBox="0 0 720 320" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#5b6b63"/>
+        </marker>
+        <style>
+          .box { fill: #fff; stroke: #0a8a4a; stroke-width: 1.5; }
+          .box-ext { fill: #fff; stroke: #5b6b63; stroke-width: 1.5; stroke-dasharray: 4 3; }
+          .lbl { font: 13px -apple-system, "Hiragino Sans", sans-serif; fill: #1a2b22; }
+          .lbl-s { font: 11px -apple-system, "Hiragino Sans", sans-serif; fill: #5b6b63; }
+          .ln { stroke: #5b6b63; stroke-width: 1.5; fill: none; }
+        </style>
+      </defs>
+
+      <!-- 外部 -->
+      <rect class="box-ext" x="20" y="40" width="150" height="60" rx="8"/>
+      <text class="lbl" x="95" y="68" text-anchor="middle">ODPT (GBFS)</text>
+      <text class="lbl-s" x="95" y="86" text-anchor="middle">公共交通オープンデータ</text>
+
+      <!-- Vercel Cron -->
+      <rect class="box" x="220" y="40" width="150" height="60" rx="8"/>
+      <text class="lbl" x="295" y="68" text-anchor="middle">Vercel Cron</text>
+      <text class="lbl-s" x="295" y="86" text-anchor="middle">定期取り込み (静的 / 動的の 2 ジョブ)</text>
+
+      <!-- DB -->
+      <rect class="box" x="420" y="20" width="150" height="50" rx="8"/>
+      <text class="lbl" x="495" y="42" text-anchor="middle">Neon Postgres</text>
+      <text class="lbl-s" x="495" y="58" text-anchor="middle">ポート情報 (静的)</text>
+
+      <!-- KV -->
+      <rect class="box" x="420" y="80" width="150" height="50" rx="8"/>
+      <text class="lbl" x="495" y="102" text-anchor="middle">Upstash Redis</text>
+      <text class="lbl-s" x="495" y="118" text-anchor="middle">空き台数 (動的キャッシュ)</text>
+
+      <!-- API -->
+      <rect class="box" x="220" y="180" width="150" height="60" rx="8"/>
+      <text class="lbl" x="295" y="208" text-anchor="middle">Next.js API</text>
+      <text class="lbl-s" x="295" y="226" text-anchor="middle">/api/stations</text>
+
+      <!-- Browser -->
+      <rect class="box" x="20" y="180" width="150" height="60" rx="8"/>
+      <text class="lbl" x="95" y="208" text-anchor="middle">ブラウザ</text>
+      <text class="lbl-s" x="95" y="226" text-anchor="middle">MapLibre GL 地図</text>
+
+      <!-- Lines -->
+      <line class="ln" x1="170" y1="70" x2="220" y2="70" marker-end="url(#arrow)"/>
+      <line class="ln" x1="370" y1="60" x2="420" y2="45" marker-end="url(#arrow)"/>
+      <line class="ln" x1="370" y1="80" x2="420" y2="105" marker-end="url(#arrow)"/>
+      <line class="ln" x1="495" y1="130" x2="370" y2="210" marker-end="url(#arrow)"/>
+      <line class="ln" x1="220" y1="210" x2="170" y2="210" marker-end="url(#arrow)"/>
+
+      <text class="lbl-s" x="360" y="290" text-anchor="middle">点線 = 外部サービス　／　実線矩形 = Portly が管理する範囲</text>
+    </svg>
+  </div>
+</section>
+
+<!-- 4. 技術スタックの選定理由 -->
+<section>
+  <h2>4. 技術スタックと選んだ理由</h2>
+  <p>すべて「サーバ運用を持たずに、Web 完結でリアルタイム性も出す」という方針から逆算しています。</p>
+  <table>
+    <thead>
+      <tr><th>レイヤ</th><th>採用したもの</th><th>なぜそれか</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="layer">フロントエンド</td>
+        <td class="tech">Next.js 15 + React 19</td>
+        <td>Web 完結方針と相性が良く、Vercel への素直なデプロイで運用負荷を最小化できる。</td>
+      </tr>
+      <tr>
+        <td class="layer">地図</td>
+        <td class="tech">MapLibre GL JS</td>
+        <td>OSS 由来でライセンスの縛りが緩く、ベクタータイル表示にも対応。将来の見た目調整に幅がある。</td>
+      </tr>
+      <tr>
+        <td class="layer">データベース</td>
+        <td class="tech">Neon Postgres + Drizzle ORM</td>
+        <td>サーバレス Postgres でアイドルコストがほぼゼロ。型安全な ORM でスキーマ変更も安全。</td>
+      </tr>
+      <tr>
+        <td class="layer">キャッシュ</td>
+        <td class="tech">Upstash Redis</td>
+        <td>地図をパン/ズームするたびに走る API を吸収。DB への直撃を防ぎ、表示も速くなる。</td>
+      </tr>
+      <tr>
+        <td class="layer">定期実行</td>
+        <td class="tech">Vercel Cron</td>
+        <td>外部 cron サービスを足さず、デプロイと同じ場所で完結。GBFS の定期取り込みに十分。</td>
+      </tr>
+      <tr>
+        <td class="layer">データソース</td>
+        <td class="tech">GBFS / ODPT</td>
+        <td>公的オープンデータ。HELLO CYCLING・ドコモいずれも GBFS で公開しており、横断対応がしやすい。</td>
+      </tr>
+      <tr>
+        <td class="layer">スタイル</td>
+        <td class="tech">Tailwind CSS</td>
+        <td>UI を素早く組み、デザインの一貫性を保てる。地図上の小さな UI 部品との相性も良い。</td>
+      </tr>
+      <tr>
+        <td class="layer">バリデーション</td>
+        <td class="tech">Zod</td>
+        <td>外部 API (GBFS) のレスポンスを実行時に検証。フォーマット変化を早期に検知できる。</td>
+      </tr>
+      <tr>
+        <td class="layer">ホスティング</td>
+        <td class="tech">Vercel</td>
+        <td>Next.js / Cron / DB / Redis を 1 ベンダーで束ねられ、個人運用の負荷が最小。</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 5. データの流れ -->
+<section>
+  <h2>5. データの流れ (2 つの経路)</h2>
+  <p>「定期的にデータを溜める経路」と「ブラウザが必要な範囲だけ取りに来る経路」が分かれているのがポイントです。</p>
+
+  <h3>定期更新 (裏側)</h3>
+  <div class="flow">
+    <div class="flow-step">
+      <span class="when">毎日 03:00</span>
+      <b>静的同期</b> — ODPT からポート情報 (場所・名前・容量) を取り込み Postgres に保存。
+    </div>
+    <div class="flow-step">
+      <span class="when">毎日 04:00</span>
+      <b>動的更新</b> — 各ポートの空き台数・空き枠を取得し、Redis に短い寿命で保存。
+    </div>
+  </div>
+  <p class="note">※ 無料プランの cron 制約に合わせて 1 日 1 回。プランを上げれば 10 分間隔等に細かくする想定。</p>
+
+  <h3>画面表示 (表側)</h3>
+  <div class="flow">
+    <div class="flow-step">
+      <span class="when">パン/ズーム時</span>
+      <b>範囲だけ取得</b> — 地図に映っている範囲 (bbox) を API に渡し、必要なポートだけ返す。
+    </div>
+    <div class="flow-step">
+      <span class="when">ピン押下時</span>
+      <b>詳細フェッチ</b> — 最初は最小情報だけ返し、ピンを押したときに詳細を別 API で読みに行く。
+    </div>
+  </div>
+  <p class="note">※ 一覧 API のレスポンスを軽くして、地図移動時の通信を 60% 以上削減しています。</p>
+</section>
+
+<!-- 6. 収益とサステナビリティ -->
+<section>
+  <h2>6. 収益とサステナビリティ</h2>
+  <p>長期的に運用を続けるため、複数の小さな収益源を組み合わせる方針です。</p>
+  <ul>
+    <li><strong>Google AdSense</strong> — 地図横のサイドバーに控えめに表示。ユーザー体験を壊さない位置に限定。</li>
+    <li><strong>アフィリエイト</strong> — 自転車・旅行関連の記事/ガイドからの送客。</li>
+    <li><strong>将来の B2B API</strong> — 不動産・観光事業者向けに、エリア別ポート密度などのデータ提供。</li>
+  </ul>
+  <p>有料プランや課金で締め出さず、<strong>Web で誰でも開けるオープンさ</strong>を維持することを優先しています。</p>
+</section>
+
+<!-- 7. 今後 -->
+<section>
+  <h2>7. これからやりたいこと</h2>
+  <ul>
+    <li>ポートが密集するエリアでのクラスタリング表示の再有効化</li>
+    <li>LUUP / PiPPA など、他のシェアサービスへの対応拡大</li>
+    <li>「東京のシェアサイクル徹底ガイド」のような地域別ガイド記事による SEO 強化</li>
+    <li>ヒートマップ表示 (どこが借りやすい / 返しやすいかの直感的可視化)</li>
+  </ul>
+</section>
+
+</main>
+
+<footer>
+  <p>
+    データ出典: ODPT (公共交通オープンデータセンター) ／ OpenStreetMap contributors ／ DataOfJapan 都道府県境界<br>
+    Portly は上記オープンデータを利用しています。
+  </p>
+</footer>
+
+</body>
+</html>
