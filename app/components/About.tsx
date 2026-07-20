@@ -78,7 +78,7 @@ export function AboutModal() {
                   </a>
                 </li>
                 <li>
-                  株式会社ドコモ・バイクシェア「バイクシェア関連情報 (GBFS, 東京エリア)」、
+                  株式会社ドコモ・バイクシェア「バイクシェア関連情報 (GBFS)」、
                   <a
                     href="https://creativecommons.org/licenses/by/4.0/deed.ja"
                     target="_blank"

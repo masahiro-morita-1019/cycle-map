@@ -93,6 +93,10 @@ export type StationLite = {
   provider: Provider;
   lat: number;
   lon: number;
-  /** num_bikes_available。status 未取得時は 0。 */
-  bikes: number;
+  /** num_bikes_available。status 未取得時は null。 */
+  bikes: number | null;
+  /** スナップショット取得時刻を基準にした鮮度。 */
+  statusFreshness: "fresh" | "stale" | "unknown";
+  statusUpdatedAt: number | null;
+  isRenting: boolean | null;
 };

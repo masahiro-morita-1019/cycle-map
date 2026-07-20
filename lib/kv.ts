@@ -1,7 +1,13 @@
 import { Redis } from "@upstash/redis";
 import type { Provider, StationStatus } from "./gbfs/types";
 
-const STATUS_TTL_SECONDS = 60 * 10; // 10 min — much longer than poll cadence so stale-while-revalidate works
+// Vercel Hobby runs the bundled cron daily. Keep the last successful snapshot
+// long enough to distinguish stale data from missing data instead of turning
+// every station into a false zero. Frequent external cron users can lower this.
+const STATUS_TTL_SECONDS = positiveInt(
+  process.env.STATUS_TTL_SECONDS,
+  60 * 60 * 48,
+);
 
 let _redis: Redis | null = null;
 
@@ -54,4 +60,9 @@ export async function readAllStatusSnapshots(
     if (snap) map.set(p, snap);
   }
   return map;
+}
+
+function positiveInt(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }

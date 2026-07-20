@@ -58,7 +58,8 @@ export function MapView() {
   });
   const [bbox, setBbox] = useState<[number, number, number, number] | null>(null);
 
-  const stations = useStations(bbox, state.services);
+  const stationState = useStations(bbox, state.services);
+  const { stations } = stationState;
 
   // Init map once
   useEffect(() => {
@@ -149,6 +150,9 @@ export function MapView() {
           "circle-stroke-width": 3,
           "circle-stroke-color": [
             "case",
+            ["==", ["get", "statusFreshness"], "unknown"], "#9ca3af",
+            ["==", ["get", "statusFreshness"], "stale"], "#a855f7",
+            ["==", ["get", "isRenting"], false], "#111827",
             ["==", ["get", "bikes"], 0], "#374151", // 空き0 = 濃灰
             ["<", ["get", "bikes"], 3], "#fbbf24",  // 少ない = 黄
             "#22c55e",                                // 十分 = 緑
@@ -293,6 +297,29 @@ export function MapView() {
         />
         {state.zoom < COVERAGE_MAX_ZOOM ? <CoverageLegend /> : null}
       </div>
+      <div
+        className="pointer-events-none absolute bottom-16 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-2 text-xs"
+        role="status"
+        aria-live="polite"
+      >
+        {stationState.isLoading ? (
+          <StatusBadge>ポート情報を読み込み中…</StatusBadge>
+        ) : null}
+        {stationState.error ? (
+          <StatusBadge>{stationState.error}</StatusBadge>
+        ) : null}
+        {stationState.truncated ? (
+          <StatusBadge>表示上限に達しました。地図を拡大してください。</StatusBadge>
+        ) : null}
+        {!stationState.isLoading &&
+        stations.some((station) => station.statusFreshness === "stale") ? (
+          <StatusBadge>紫の縁は更新が古い空き情報です。</StatusBadge>
+        ) : null}
+        {!stationState.isLoading &&
+        stations.some((station) => station.statusFreshness === "unknown") ? (
+          <StatusBadge>灰色の縁は空き情報を取得できていません。</StatusBadge>
+        ) : null}
+      </div>
     </>
   );
 }
@@ -309,7 +336,17 @@ function toFeatureCollection(
         id: s.id,
         provider: s.provider,
         bikes: s.bikes,
+        isRenting: s.isRenting,
+        statusFreshness: s.statusFreshness,
       },
     })),
   };
+}
+
+function StatusBadge({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-full bg-neutral-950/90 px-3 py-1.5 text-neutral-100 shadow-lg ring-1 ring-white/15 backdrop-blur">
+      {children}
+    </span>
+  );
 }

@@ -7,6 +7,7 @@ import {
   ProviderSchema,
   type Provider,
   type StationLite,
+  type StationStatus,
 } from "@/lib/gbfs/types";
 
 export const runtime = "nodejs";
@@ -17,10 +18,15 @@ const CACHE_TTL_MS = 3 * 60 * 1000;
 const MAX_RESPONSE_CACHE_ENTRIES = 100;
 const CACHE_CONTROL = "public, s-maxage=180, stale-while-revalidate=300";
 const PROVIDER_ORDER: Provider[] = ["hellocycling", "docomo"];
+const STATUS_STALE_AFTER_SECONDS = positiveInt(
+  process.env.STATUS_STALE_AFTER_SECONDS,
+  15 * 60,
+);
 
 type StationsResponse = {
   stations: StationLite[];
   count: number;
+  truncated: boolean;
 };
 
 type Timings = {
@@ -33,12 +39,17 @@ type Timings = {
 
 type StatusCacheEntry = {
   expiresAt: number;
-  bikesById: Map<string, number>;
+  statusById: Map<string, StatusWithSnapshot>;
 };
 
 type StatusReadResult = {
-  bikesById: Map<string, number>;
+  statusById: Map<string, StatusWithSnapshot>;
   complete: boolean;
+};
+
+type StatusWithSnapshot = {
+  status: StationStatus;
+  fetchedAt: number;
 };
 
 type ResponseCacheEntry = {
@@ -64,7 +75,7 @@ export async function GET(req: NextRequest) {
   }
   if (providers.length === 0) {
     return jsonWithHeaders(
-      { stations: [], count: 0 },
+      { stations: [], count: 0, truncated: false },
       {
         db: 0,
         status: 0,
@@ -90,7 +101,7 @@ export async function GET(req: NextRequest) {
   }
 
   const dbStartedAt = performance.now();
-  const rows = await db
+  const queriedRows = await db
     .select({
       id: schema.stations.id,
       provider: schema.stations.provider,
@@ -107,24 +118,38 @@ export async function GET(req: NextRequest) {
         lte(schema.stations.lon, parsedBbox.east),
       ),
     )
-    .limit(MAX_RESULTS);
+    .limit(MAX_RESULTS + 1);
+  const truncated = queriedRows.length > MAX_RESULTS;
+  const rows = queriedRows.slice(0, MAX_RESULTS);
   const dbMs = performance.now() - dbStartedAt;
 
   const statusStartedAt = performance.now();
-  const bikesById = await getBikesById(providers);
+  const statusById = await getStatusById(providers);
   const statusMs = performance.now() - statusStartedAt;
 
   const mergeStartedAt = performance.now();
-  const stations: StationLite[] = rows.map((r) => ({
-    id: r.id,
-    provider: r.provider as Provider,
-    lat: r.lat,
-    lon: r.lon,
-    bikes: bikesById.get(r.id) ?? 0,
-  }));
+  const now = Math.floor(Date.now() / 1000);
+  const stations: StationLite[] = rows.map((r) => {
+    const current = statusById.get(r.id);
+    return {
+      id: r.id,
+      provider: r.provider as Provider,
+      lat: r.lat,
+      lon: r.lon,
+      bikes: current?.status.numBikesAvailable ?? null,
+      isRenting: current?.status.isRenting ?? null,
+      statusUpdatedAt:
+        current?.status.lastReported ?? current?.fetchedAt ?? null,
+      statusFreshness: !current
+        ? "unknown"
+        : now - current.fetchedAt > STATUS_STALE_AFTER_SECONDS
+          ? "stale"
+          : "fresh",
+    };
+  });
   const mergeMs = performance.now() - mergeStartedAt;
 
-  const body = { stations, count: stations.length };
+  const body = { stations, count: stations.length, truncated };
   setResponseCache(cacheKey, body);
 
   const timings: Timings = {
@@ -161,42 +186,46 @@ function responseCacheKey(bbox: Bbox, providers: Provider[]) {
   ].join("|");
 }
 
-async function getBikesById(providers: Provider[]): Promise<Map<string, number>> {
+async function getStatusById(
+  providers: Provider[],
+): Promise<Map<string, StatusWithSnapshot>> {
   const key = providers.join(",");
   const now = Date.now();
   const cached = statusCache.get(key);
-  if (cached && cached.expiresAt > now) return cached.bikesById;
+  if (cached && cached.expiresAt > now) return cached.statusById;
 
   const pending = pendingStatusReads.get(key);
   if (pending) {
     const result = await pending;
-    return result.bikesById;
+    return result.statusById;
   }
 
-  const promise = readBikesById(providers);
+  const promise = readStatusById(providers);
   pendingStatusReads.set(key, promise);
   try {
     const result = await promise;
     if (result.complete) {
       statusCache.set(key, {
         expiresAt: Date.now() + CACHE_TTL_MS,
-        bikesById: result.bikesById,
+        statusById: result.statusById,
       });
     }
-    return result.bikesById;
+    return result.statusById;
   } finally {
     pendingStatusReads.delete(key);
   }
 }
 
-async function readBikesById(providers: Provider[]): Promise<StatusReadResult> {
+async function readStatusById(providers: Provider[]): Promise<StatusReadResult> {
   const snapshots = await readAllStatusSnapshots(providers);
-  const bikesById = new Map<string, number>();
+  const statusById = new Map<string, StatusWithSnapshot>();
   for (const snap of snapshots.values()) {
-    for (const s of snap.statuses) bikesById.set(s.id, s.numBikesAvailable);
+    for (const status of snap.statuses) {
+      statusById.set(status.id, { status, fetchedAt: snap.fetchedAt });
+    }
   }
   return {
-    bikesById,
+    statusById,
     complete: providers.every((p) => snapshots.has(p)),
   };
 }
@@ -253,4 +282,9 @@ function logTimings(key: string, t: Timings, count: number) {
 
 function roundMs(ms: number) {
   return Math.round(ms * 10) / 10;
+}
+
+function positiveInt(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }

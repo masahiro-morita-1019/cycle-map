@@ -11,7 +11,17 @@ const PROVIDER_ORDER: Provider[] = ["hellocycling", "docomo"];
 
 type StationCacheEntry = {
   expiresAt: number;
+  response: StationsResponse;
+};
+
+type StationsResponse = {
   stations: StationLite[];
+  truncated: boolean;
+};
+
+export type StationsState = StationsResponse & {
+  isLoading: boolean;
+  error: string | null;
 };
 
 const stationCache = new Map<string, StationCacheEntry>();
@@ -19,8 +29,13 @@ const stationCache = new Map<string, StationCacheEntry>();
 export function useStations(
   bbox: [number, number, number, number] | null,
   services: Provider[],
-): StationLite[] {
-  const [stations, setStations] = useState<StationLite[]>([]);
+): StationsState {
+  const [result, setResult] = useState<StationsState>({
+    stations: [],
+    truncated: false,
+    isLoading: false,
+    error: null,
+  });
   const roundedBbox = bbox ? roundBboxOut(bbox) : null;
   const bboxKey = roundedBbox ? roundedBbox.map((n) => n.toFixed(2)).join(",") : "";
   const normalizedServices = normalizeServices(services);
@@ -29,15 +44,17 @@ export function useStations(
 
   useEffect(() => {
     if (!roundedBbox || normalizedServices.length === 0) {
-      setStations([]);
+      setResult({ stations: [], truncated: false, isLoading: false, error: null });
       return;
     }
 
     const cached = getCache(cacheKey);
     if (cached) {
-      setStations(cached);
+      setResult({ ...cached, isLoading: false, error: null });
       return;
     }
+
+    setResult({ stations: [], truncated: false, isLoading: true, error: null });
 
     const controller = new AbortController();
     const timer = setTimeout(async () => {
@@ -49,13 +66,19 @@ export function useStations(
         const res = await fetch(`/api/stations?${sp.toString()}`, {
           signal: controller.signal,
         });
-        if (!res.ok) return;
-        const data = (await res.json()) as { stations: StationLite[] };
-        setCache(cacheKey, data.stations);
-        setStations(data.stations);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as StationsResponse;
+        setCache(cacheKey, data);
+        setResult({ ...data, isLoading: false, error: null });
       } catch (err) {
         if ((err as { name?: string }).name !== "AbortError") {
           console.error("useStations:", err);
+          setResult({
+            stations: [],
+            truncated: false,
+            isLoading: false,
+            error: "ポート情報を取得できませんでした。",
+          });
         }
       }
     }, FETCH_DEBOUNCE_MS);
@@ -66,7 +89,7 @@ export function useStations(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cacheKey, servicesKey]);
 
-  return stations;
+  return result;
 }
 
 function normalizeServices(services: Provider[]) {
@@ -87,7 +110,7 @@ function roundBboxOut(
   ];
 }
 
-function getCache(key: string): StationLite[] | null {
+function getCache(key: string): StationsResponse | null {
   const cached = stationCache.get(key);
   if (!cached) return null;
   if (cached.expiresAt <= Date.now()) {
@@ -96,13 +119,13 @@ function getCache(key: string): StationLite[] | null {
   }
   stationCache.delete(key);
   stationCache.set(key, cached);
-  return cached.stations;
+  return cached.response;
 }
 
-function setCache(key: string, stations: StationLite[]) {
+function setCache(key: string, response: StationsResponse) {
   stationCache.set(key, {
     expiresAt: Date.now() + CACHE_TTL_MS,
-    stations,
+    response,
   });
   while (stationCache.size > MAX_CACHE_ENTRIES) {
     const oldest = stationCache.keys().next().value;

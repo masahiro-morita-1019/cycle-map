@@ -32,10 +32,10 @@ MVP のコードは実装済み。ローカルで地図 UI が動作すること
 1. ODPT 開発者サイト (<https://developer.odpt.org/>) でアクセストークンを発行
 2. `.env.local` に `ODPT_CONSUMER_KEY=...` を追記
 3. ODPT ダッシュボードで **HELLO CYCLING の実際の system_id** を確認
-   - コード上は `"openstreet"` と推測で入れている
+   - コード上の既定値は `"hellocycling"`
    - 違う場合は `.env.local` に `ODPT_HELLOCYCLING_SYSTEM_ID=<実際の名前>` を追加 (ドコモは `docomo-cycle-tokyo` で確定)
 4. `pnpm poll:once` を実行し、両サービスとも `ok: N stations / N statuses` が出ることを確認
-5. `pnpm dev` で <http://localhost:3000> を開き、地図上にマーカー (緑/黄/赤の色分け) が表示されることを確認
+5. `pnpm dev` で <http://localhost:3000> を開き、地図上にサービス色のマーカーと空き状況の縁色が表示されることを確認
 6. 確認できたら Vercel に本番デプロイ
    - Vercel プロジェクト作成 → GitHub 連携 (リポジトリは <https://github.com/masahiro-morita-1019/cycle-map>)
    - Vercel 環境変数に `ODPT_CONSUMER_KEY` と `CRON_SECRET` (`openssl rand -base64 32` で生成) を追加
@@ -44,7 +44,7 @@ MVP のコードは実装済み。ローカルで地図 UI が動作すること
 
 ### 任意で後回しになっている項目
 
-- 連絡先メールアドレス: `app/components/About.tsx:6` の `contact@example.com` を実アドレスに差し替え
+- 動的データを数分間隔で更新する外部 Cron または Vercel Pro の設定
 - Protomaps API キー: 設定すれば見た目が綺麗になる (未設定なら OSM raster でも動作)
 
 ---
@@ -109,7 +109,7 @@ pnpm install
 | Upstash Redis (Vercel Marketplace) | Vercel ダッシュボード → Storage → Create → KV | ✓ |
 | Neon Postgres | <https://neon.tech/> もしくは Vercel ダッシュボード → Storage → Create → Postgres | ✓ |
 | Protomaps API キー | <https://protomaps.com/> | 任意 (未設定なら OSM ラスタ) |
-| Cron Secret | 任意の長いランダム文字列 | 本番のみ |
+| Cron Secret | 任意の長いランダム文字列 | 本番では必須 |
 
 ### 3. 環境変数を設定
 
@@ -126,7 +126,7 @@ cp .env.example .env.local
 ODPT_CONSUMER_KEY=取得したアクセストークン
 
 # (任意) ODPT 上の system_id を上書きする場合
-# ODPT_HELLOCYCLING_SYSTEM_ID=openstreet
+# ODPT_HELLOCYCLING_SYSTEM_ID=hellocycling
 # ODPT_DOCOMO_SYSTEM_ID=docomo-cycle-tokyo
 
 # Upstash Redis (Vercel Marketplace の Upstash for Redis 統合で自動注入)
@@ -144,7 +144,7 @@ CRON_SECRET=
 NEXT_PUBLIC_PROTOMAPS_API_KEY=
 ```
 
-> **HELLO CYCLING の system_id について**: 仮で `openstreet` を入れている。ODPT 登録後にダッシュボードで実際のエンドポイントを確認し、違っていれば `ODPT_HELLOCYCLING_SYSTEM_ID` で上書きする。
+> **HELLO CYCLING の system_id について**: 既定値は `hellocycling`。ODPT 側の命名が変わった場合は `ODPT_HELLOCYCLING_SYSTEM_ID` で上書きする。
 
 ### 4. データベースを初期化
 
@@ -161,11 +161,12 @@ pnpm poll:once
 ```
 
 ODPT から HELLO CYCLING / ドコモのポート情報を取得し、Postgres と KV に書き込む。
+途中で1サービスでも失敗した場合、コマンドは終了コード1を返す。
 出力例:
 
 ```
-[hellocycling] fetching... ok: 12345 stations / 12345 statuses
-[docomo] fetching... ok: 800 stations / 800 statuses
+[hellocycling] syncing... ok: 12345 stations / 12345 statuses
+[docomo] syncing... ok: 800 stations / 800 statuses
 ```
 
 ### 6. 都道府県境界 GeoJSON を配置 (任意)
@@ -196,7 +197,8 @@ pnpm dev
 | 右上のロケートボタン | 現在地へジャンプ |
 | 左上のサービスフィルタ | HELLO CYCLING / ドコモ を個別にオン/オフ |
 | ポートマーカーをクリック | 借りられる台数・返せる台数・最終更新時刻を表示 |
-| 緑/黄/赤マーカー | 空きが十分/少ない/0 |
+| マーカーの塗り | 黄=HELLO CYCLING、赤=ドコモ・バイクシェア |
+| マーカーの縁 | 緑=貸出余裕あり、黄=残りわずか、濃灰=0台、紫=更新が古い、灰=情報なし |
 | 青いまるい数字 | クラスタ。クリックすると展開ズーム |
 | ズームアウト | 都道府県カバレッジを塗り分け表示 (GeoJSON 配置時のみ) |
 | URL | 現在の位置・ズーム・フィルタが保存される。共有/ブックマーク可能 |
@@ -243,7 +245,7 @@ cycle-map/
 ├── db/
 │   └── schema.ts                   # stations テーブル定義
 ├── scripts/
-│   └── poll-once.ts                # 単発ポーリング (動作確認用)
+│   └── poll-once.ts                # Postgres / KV への単発同期
 ├── public/
 │   └── prefectures.json            # ※自分で配置 (任意)
 ├── drizzle.config.ts
@@ -264,7 +266,7 @@ pnpm lint         # ESLint
 pnpm db:push      # スキーマを DB に同期 (開発時)
 pnpm db:generate  # マイグレーションファイル生成
 pnpm db:migrate   # マイグレーション実行
-pnpm poll:once    # GBFS を 1 回ポーリング (確認用)
+pnpm poll:once    # GBFS を取得し Postgres / KV に同期
 ```
 
 ---
@@ -275,7 +277,7 @@ pnpm poll:once    # GBFS を 1 回ポーリング (確認用)
 2. Storage → Marketplace から **Upstash for Redis** と **Neon Postgres** を Install → 環境変数が自動注入される
 3. プロジェクト設定の Environment Variables に以下を追加:
    - `ODPT_CONSUMER_KEY`
-   - `CRON_SECRET` (任意の長い文字列)
+   - `CRON_SECRET` (本番では必須。任意の長いランダム文字列)
    - `NEXT_PUBLIC_PROTOMAPS_API_KEY` (任意)
 4. Deploy
 5. 初回デプロイ後、Vercel ダッシュボードの Cron Jobs タブで以下が登録されていることを確認:
@@ -287,6 +289,8 @@ pnpm poll:once    # GBFS を 1 回ポーリング (確認用)
 > deployment 自体が失敗するため、本番設定では `/api/cron/poll` も日次 (`0 4 * * *`)
 > にしている。数分単位の鮮度が必要になったら Pro 以上へ上げるか、外部 cron サービスから
 > `/api/cron/poll` を `Authorization: Bearer $CRON_SECRET` で叩く。
+> 最後に取得できたデータは既定で48時間保持するが、15分を超えると地図上で「更新が古い」と表示する。
+> 更新頻度を上げた場合は `STATUS_TTL_SECONDS` も更新間隔の2〜3倍を目安に短縮する。
 
 ---
 
@@ -294,11 +298,11 @@ pnpm poll:once    # GBFS を 1 回ポーリング (確認用)
 
 - HELLO CYCLING (OpenStreet 株式会社): GBFS / CC BY 4.0
   - <https://ckan.odpt.org/dataset/c_bikeshare_gbfs-openstreet>
-- ドコモ・バイクシェア (東京エリア): GBFS / CC BY 4.0
+- ドコモ・バイクシェア (全国版): GBFS / CC BY 4.0
   - <https://ckan.odpt.org/ja/dataset/c_bikeshare_gbfs-d-bikeshare>
 - 配信は **公共交通オープンデータセンター** 経由 — <https://www.odpt.org/>
 
-> ドコモ・バイクシェアの ODPT 経由オープンデータは現状 **東京都内エリアのみ**。横浜・川崎・仙台・広島等は本アプリでは表示されない。
+> 本アプリはドコモ・バイクシェアの全国版 system ID (`docomo-cycle`) を利用する。必要に応じて `ODPT_DOCOMO_SYSTEM_ID` で対象を上書きできる。
 
 UI フッターに「出典: 公共交通オープンデータセンター (CC BY 4.0)」のクレジットを常時表示している。CC BY 4.0 の条件に従って必ず保持すること。
 

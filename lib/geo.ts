@@ -14,6 +14,14 @@ export function parseBbox(input: string | null): Bbox | null {
     return null;
   }
   const [west, south, east, north] = parts;
+  if (
+    west < -180 ||
+    east > 180 ||
+    south < -90 ||
+    north > 90
+  ) {
+    return null;
+  }
   if (west >= east || south >= north) return null;
   return { west, south, east, north };
 }

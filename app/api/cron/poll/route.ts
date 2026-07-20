@@ -1,15 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { PROVIDERS, fetchStatus } from "@/lib/providers";
-import { normalizeStatuses } from "@/lib/gbfs/normalize";
-import { writeStatusSnapshot } from "@/lib/kv";
-import type { Provider } from "@/lib/gbfs/types";
+import { authorizeCron } from "@/lib/cron-auth";
+import { PROVIDERS } from "@/lib/providers";
+import { pollProvider } from "@/lib/sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  if (!isAuthorized(req)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const auth = authorizeCron(req);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
   const results = await Promise.allSettled(
@@ -26,24 +26,6 @@ export async function GET(req: NextRequest) {
   const allOk = summary.every((s) => s.ok);
   return NextResponse.json(
     { ok: allOk, providers: summary },
-    { status: allOk ? 200 : 207 },
+    { status: allOk ? 200 : 503 },
   );
-}
-
-async function pollProvider(provider: Provider) {
-  const raw = await fetchStatus(provider);
-  const statuses = normalizeStatuses(provider, raw);
-  await writeStatusSnapshot({
-    provider,
-    fetchedAt: Math.floor(Date.now() / 1000),
-    statuses,
-  });
-  return { count: statuses.length };
-}
-
-function isAuthorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // Local dev: allow.
-  const header = req.headers.get("authorization");
-  return header === `Bearer ${secret}`;
 }

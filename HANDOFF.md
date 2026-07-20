@@ -17,7 +17,7 @@
 |---|---|---|
 | API スリム化 | `/api/stations` のレスポンスを 5 フィールドに絞る ([app/api/stations/route.ts](app/api/stations/route.ts)) | 1,752件で 500KB → **160KB に削減 (1/3)** |
 | 詳細 API 新設 | `/api/stations/[id]` を追加し、popup クリック時のみ詳細を取得 ([app/api/stations/[id]/route.ts](app/api/stations/[id]/route.ts)) | 初期ロードから popup 用フィールドを切り離し |
-| プロバイダ色分け | 塗り = プロバイダ (赤=ドコモ / 青=HELLO)、ストローク = 空き状況 (緑/黄/濃灰) ([app/components/MapView.tsx](app/components/MapView.tsx)) | 一目で区別可能 |
+| プロバイダ色分け | 塗り = プロバイダ (赤=ドコモ / 黄=HELLO)、ストローク = 空き状況 (緑/黄/濃灰) ([app/components/MapView.tsx](app/components/MapView.tsx)) | 一目で区別可能 |
 | popup 遅延 fetch | クリック → 「読み込み中」popup を即表示 → 詳細を取得して差し替え | UI ブロックなし、AbortController 連続クリック対応済み |
 | debounce 延長 | useStations の fetch debounce を 250ms → 400ms ([app/hooks/useStations.ts](app/hooks/useStations.ts)) | 地図パン中の無駄 fetch を抑制 |
 | StationLite 型 | 一覧用の軽量型を追加 ([lib/gbfs/types.ts](lib/gbfs/types.ts)) | 型安全に分離 |
@@ -32,9 +32,9 @@
 
 ---
 
-## 保留中の課題: クラスタリング再有効化
+## 解決済み: クラスタリング再有効化
 
-当初計画では `cluster: true` を復活させる予定だったが、Next.js dev 環境で **MapLibre worker URL 解決が壊れている** ことが判明し、応急処置として `cluster: false` のままにしている。
+MapLibre worker を `postinstall` で `public/` にコピーし、`cluster: true` を再有効化済み。
 
 ### 試行と結果
 
@@ -45,23 +45,23 @@
 
 `worker` ファイル自体は `node_modules/.pnpm/maplibre-gl@4.7.1/node_modules/maplibre-gl/dist/maplibre-gl-csp-worker.js` に存在するが、webpack-internal の URL 解決で起動失敗する。
 
-### 解決策の見立て
+### 採用した解決策
 
-`scripts/copy-maplibre-worker.ts` で `node_modules/.../maplibre-gl-csp-worker.js` を `public/maplibre-gl-csp-worker.js` にコピーする postinstall スクリプトを作り、MapView.tsx で:
+`scripts/copy-maplibre-worker.mjs` で `node_modules/.../maplibre-gl-csp-worker.js` を `public/maplibre-gl-csp-worker.js` にコピーし、MapView.tsx で:
 
 ```ts
 maplibregl.setWorkerUrl("/maplibre-gl-csp-worker.js");
 ```
 
-を指定する想定。所要は 15〜20 分。これで dev / 本番ともに worker が public assets から提供される。
+を指定している。これにより dev / 本番ともに worker が public assets から提供される。
 
-優先度は**中**。クラスタ無しでも、API スリム化と色分けで体感は大きく改善している。クラスタが効くのはズームアウト時 (都道府県スケール) の描画コスト削減なので、ヘビーユーザーが触り始めてから対応で十分。
+現在はズーム14以下でクラスタリングされる。
 
 ---
 
 ## 既知の小さな TODO
 
-- **連絡先メールアドレス**: [app/components/About.tsx:6](app/components/About.tsx) の `contact@example.com` を実アドレスに差し替え
+- **動的データ更新頻度**: 現在の Vercel Hobby Cron は日次。数分間隔にするには外部 Cron または Pro プランを設定する
 - **Protomaps API キー**: 未設定なら OSM ラスタ動作。設定すれば見た目が綺麗に
 - **本番 Vercel デプロイ**: GitHub 連携と環境変数の登録のみ。手順は [README.md](README.md) の「再開チェックリスト」参照。`CRON_SECRET` は Vercel 側で `openssl rand -base64 32` で生成して登録。Vercel Hobby は分単位 Cron で deployment が失敗するため、`vercel.json` は日次 Cron にしている。
 - **ベクタータイル化** (将来): MVT を生成してサーバ側で配信すれば、クライアントは bbox に関係なくタイル単位で描画。ベスト構成だが実装数日規模
@@ -85,9 +85,9 @@ maplibregl.setWorkerUrl("/maplibre-gl-csp-worker.js");
 ## 再開時のクイック動作確認手順
 
 1. `pnpm install` (新しい依存があるかもしれないので念のため)
-2. `pnpm poll:once` で ODPT から最新データ取得 (KV の TTL 10分なので時間が空いていたら必須)
+2. `pnpm poll:once` で ODPT から最新データを取得し、Postgres / KV に同期
 3. `pnpm dev` → <http://localhost:3000>
-4. 地図にマーカーが描画されることを確認 (赤=ドコモ、青=HELLO)
+4. 地図にマーカーが描画されることを確認 (赤=ドコモ、黄=HELLO)
 5. マーカーをクリック → ポップアップが「読み込み中」→ 詳細表示の流れになることを確認
 
 何か壊れていたら:
