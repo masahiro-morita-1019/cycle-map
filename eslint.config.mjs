@@ -4,8 +4,19 @@ const compat = new FlatCompat({
   baseDirectory: import.meta.dirname,
 });
 
-export default [
+const eslintConfig = [
+  {
+    ignores: [
+      ".claude/**",
+      ".next/**",
+      "node_modules/**",
+      "next-env.d.ts",
+      "public/maplibre-gl-csp-worker.js",
+    ],
+  },
   ...compat.config({
     extends: ["next/core-web-vitals", "next/typescript"],
   }),
 ];
+
+export default eslintConfig;

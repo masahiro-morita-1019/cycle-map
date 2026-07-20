@@ -308,17 +308,6 @@ export function MapView() {
         {stationState.error ? (
           <StatusBadge>{stationState.error}</StatusBadge>
         ) : null}
-        {stationState.truncated ? (
-          <StatusBadge>表示上限に達しました。地図を拡大してください。</StatusBadge>
-        ) : null}
-        {!stationState.isLoading &&
-        stations.some((station) => station.statusFreshness === "stale") ? (
-          <StatusBadge>紫の縁は更新が古い空き情報です。</StatusBadge>
-        ) : null}
-        {!stationState.isLoading &&
-        stations.some((station) => station.statusFreshness === "unknown") ? (
-          <StatusBadge>灰色の縁は空き情報を取得できていません。</StatusBadge>
-        ) : null}
       </div>
     </>
   );
